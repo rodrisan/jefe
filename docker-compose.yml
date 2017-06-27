@@ -32,7 +32,7 @@ services:
             - /var/lib/postgresql/data
         command: "true"
     pg-admin:
-        image: fenglc/pgadmin4
+        image: fenglc/pgadmin4:1.4
         hostname: "${PROJECT_NAME}_pgadmin"
         container_name: "${PROJECT_NAME}_pgadmin"
         ports:
