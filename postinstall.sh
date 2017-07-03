@@ -1,9 +1,9 @@
 #!/bin/bash
-bundle update
+export RAILS_ENV=docker
 bundle install
+rails db:drop
 rails db:create
 rails db:migrate
-rails db:seed
 rm /usr/src/app/tmp/pids/server.pid
-rake db:seed RAILS_ENV=test
+rake db:seed
 exec "$@"
