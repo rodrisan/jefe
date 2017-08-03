@@ -72,16 +72,24 @@ load_settings_env(){
     exclude=$( get_yamlenv $1 exclude)
 }
 
-resetdb() {
-  while getopts ":e:" option; do
-    case "${option}" in
-      e)
-        e=${OPTARG}
-        ;;
-    esac
-  done
-  shift $((OPTIND-1))
+backup() {
+  e=$1
 
+  if [ -z "${e}" ]; then
+    e="docker"
+  fi
+
+  if [[ "$e" == "docker" ]]; then
+    load_dotenv
+    docker exec -it ${project_name}_rails pg_dump -U ${dbname} ${project_name} > ./db/${project_name}.sql
+  else
+    load_settings_env $e
+    ssh ${user}@${host} -p $port "mkdir -p jefe; pg_dump -U ${dbname} ${project_name} > ./jefe/${project_name}.sql"
+  fi
+}
+
+resetdb() {
+  e=$1
   if [ -z "${e}" ]; then
     e="docker"
   fi
@@ -95,7 +103,37 @@ resetdb() {
     echo    # move to a new line
     if [[ $REPLY =~ ^[Yy]$ ]]
     then
-      ssh "${user}@${host} 'export RAILS_ENV=docker;rails db:migrate VERSION=0;rails db:migrate;rails db:seed'"
+      ssh "${user}@${host} 'rails db:migrate VERSION=0;rails db:migrate;rails db:seed'"
     fi
+  fi
+}
+
+migrate() {
+  e=$1
+  if [ -z "${e}" ]; then
+    e="docker"
+  fi
+
+  if [[ "$e" == "docker" ]]; then
+    load_dotenv
+    docker exec -it ${project_name}_rails bash -c 'export RAILS_ENV=docker;rails db:migrate'
+  else
+    load_settings_env $e
+    ssh ${user}@${host} -p $port "cd ${public_dir}/; ~/.rbenv/shims/rails db:migrate"
+  fi
+}
+
+bundle_install() {
+  e=$1
+  if [ -z "${e}" ]; then
+    e="docker"
+  fi
+
+  if [[ "$e" == "docker" ]]; then
+    load_dotenv
+    docker exec -it ${project_name}_rails bash -c 'bundle install'
+  else
+    load_settings_env $e
+    ssh ${user}@${host} -p $port "cd ${public_dir}/; ~/.rbenv/shims/bundle install"
   fi
 }

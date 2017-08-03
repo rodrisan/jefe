@@ -9,5 +9,5 @@ master:
   dbuser: user
   dbpassword: password
   dbhost: localhost
-  exclude: "*.swp;*.gitignore"
+  exclude: "*.swp;postinstall.sh;*.env;tmp/;log/;public/storage/"
 
