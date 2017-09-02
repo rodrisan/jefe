@@ -1,20 +1,26 @@
-version: "2.1"
+version: "2"
 
 services:
     nginx:
         build: ./nginx/
+        hostname: "${PROJECT_NAME}_nginx"
         container_name: "${PROJECT_NAME}_nginx"
+        environment:
+            - "VIRTUAL_HOST=${VHOST}"
+            - "NGINX_PORT=${NGINX_PORT}"
         ports:
-            - 80:80
+            - "${NGINX_PORT}:80"
         volumes:
-            - "${PROJECT_ROOT}:/var/www/html:ro"
+            - "${PROJECT_ROOT}:/var/www/html"
         networks:
             - server
         depends_on:
             - php
+        command: [nginx-debug, '-g', 'daemon off;']
 
     php:
         build: ./php/
+        hostname: "${PROJECT_NAME}_php"
         container_name: "${PROJECT_NAME}_php"
         expose:
             - 9000
@@ -28,6 +34,7 @@ services:
 
     mysql:
         image: mysql:latest
+        hostname: "${PROJECT_NAME}_db"
         container_name: "${PROJECT_NAME}_db"
         volumes:
             - data:/var/lib/mysql
@@ -41,9 +48,10 @@ services:
 
     phpmyadmin:
         image: phpmyadmin/phpmyadmin
+        hostname: "${PROJECT_NAME}_phpmyadmin"
         container_name: "${PROJECT_NAME}_phpmyadmin"
         ports:
-            - 8080:80
+            - "${PHPMYADMIN_PORT}:80"
         networks:
             - database
         depends_on:
