@@ -113,13 +113,17 @@ migrate() {
   if [ -z "${e}" ]; then
     e="docker"
   fi
+  rails_env=$2
+  if [ -z "${rails_env}" ]; then
+    rails_env="development"
+  fi
 
   if [[ "$e" == "docker" ]]; then
     load_dotenv
     docker exec -it ${project_name}_rails bash -c 'export RAILS_ENV=docker;rails db:migrate'
   else
     load_settings_env $e
-    ssh ${user}@${host} -p $port "cd ${public_dir}/; ~/.rbenv/shims/rails db:migrate"
+    ssh ${user}@${host} -p $port "cd ${public_dir}/; ~/.rbenv/shims/rails RAILS_ENV=${rails_env};db:migrate"
   fi
 }
 
