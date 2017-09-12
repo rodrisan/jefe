@@ -19,395 +19,133 @@ out() {
     echo "$(tput setaf $color)$text $(tput sgr 0)"
 }
 
-version() {
-    echo 0.1
+set_dotenv(){
+    echo "$1=$2" >> .jefe/.env
 }
 
-init() {
-
-    # Print logo
-    tput setaf 2;
-    cat ./jefe/logo.txt
-
-    # create every folder needed
-
-    out "Make directory structure." 4
-
-    echo "Creating app directory..."
-    if [[ ! -d "./app" ]]; then
-        mkdir ./app
-        out "done" 2
-    else
-        out "it already exists." 3
-    fi
-
-    echo "Creating database directory..."
-    if [[ ! -d "./database" ]]; then
-        mkdir ./database
-        out "done" 2
-    else
-        out "it already exists." 3
-    fi
-
-    out "Setting configuration files." 4
-
-    echo "Writing new values to .gitigonre..."
-    if [[ ! -f  "./.gitignore" ]]; then
-        cat ./jefe/git.gitignore >> ./.gitignore
-        out "it already exists." 3
-    else
-        while read line
-        do
-            if ! grep -q "$line"  "./.gitignore"; then
-                echo "$line" >> ./.gitignore
-            fi
-        done < ./jefe/git.gitignore
-        out "it already exists." 3
-    fi
-
-    ###############################################################################################
-    # Configure project
-    ###############################################################################################
-    flag=true
-    project_type=php
-    while [ $flag = true ]; do
-        out "Configure project" 4
-        out "Select project:" 5
-        out "0) Default" 5
-        out "1) CakePHP2.x" 5
-        out "2) CakePHP3.x" 5
-        out "3) Symfony" 5
-        out "4) Laravel" 5
-        out "5) Drupal" 5
-        out "6) Prestashop" 5
-        echo "Type the option (number) from the project that you want(digit), followed by [ENTER]:"
-        read option
-        case $option in
-            0)
-                project="default"
-                flag=false
-                ;;
-            1)
-                project="cakephp2.x"
-                flag=false
-                ;;
-            2)
-                project="cakephp"
-                flag=false
-                ;;
-            3)
-                project="symfony"
-                flag=false
-                ;;
-            4)
-                project="laravel"
-                flag=false
-                ;;
-            5)
-                project="drupal"
-                flag=false
-                ;;
-            6)
-                project="prestashop"
-                flag=false
-                ;;
-            *)
-                out "Wrong choice:$option" 1
-                project=""
-                flag=true
-                ;;
-        esac
-    done
-    cp ./jefe/nginx/vhosts/$project.conf ./jefe/nginx/default.conf
-
-    # Docker compose var env configuration.
-    docker_env
-
-    # Config environments.
-    config_environments
+get_dotenv(){
+    echo $( grep "$1" .jefe/.env | sed -e "s/$1=//g" )
 }
 
-up() {
-    cd ./jefe/
-    fab up
-    cd ..
+load_dotenv(){
+    project_type=$( get_dotenv "PROJECT_TYPE" )
+    project_name=$( get_dotenv "PROJECT_NAME" )
+    project_root=$( get_dotenv "PROJECT_ROOT" )
+    dbname=$( get_dotenv "DB_NAME" )
+    dbuser=$( get_dotenv "DB_USERNAME" )
+    dbpassword=$( get_dotenv "DB_PASSWORD" )
+    dbhost=$( get_dotenv "DB_HOST" )
 }
 
-stop() {
-    cd ./jefe/
-    fab stop
-    cd ..
+# read yaml file
+parse_yaml() {
+   local prefix=$2
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+   awk -F$fs '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+      if (length($3) > 0) {
+         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      }
+   }'
 }
 
-down() {
-    cd ./jefe/
-    fab up
-    cd ..
+get_yamlenv(){
+    echo $( parse_yaml .jefe/settings.yaml | grep "^$1_$2" | sed -e "s/$1_$2=//g" | sed -e "s/\"//g")
 }
 
-bluid() {
-    cd ./jefe/
-    fab bluid
-    cd ..
-}
-
-import_sql() {
-    while getopts ":e:f:" option; do
-        case "${option}" in
-            e)
-                e=${OPTARG}
-                ;;
-            f)
-                f=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${e}" ]; then
-        e="docker"
-    fi
-
-    if [ -z "${f}" ]; then
-        f="dump.sql"
-    fi
-
-    cd ./jefe/
-    fab environment:${e},true import_sql:${f}
-    cd ..
-}
-
-dumpdb() {
-    while getopts ":e:f:" option; do
-        case "${option}" in
-            e)
-                e=${OPTARG}
-                ;;
-            f)
-                f=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${e}" ]; then
-        e="docker"
-    fi
-
-    if [ -z "${f}" ]; then
-        f="dump.sql"
-    fi
-
-    cd ./jefe/
-    fab environment:${e},true dumpdb:${f}
-    cd ..
-}
-
-resetdb() {
-    while getopts ":e:" option; do
-        case "${option}" in
-            e)
-                e=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${e}" ]; then
-        e="docker"
-    fi
-
-    cd ./jefe/
-    fab environment:${e},true resetdb
-    cd ..
-}
-
-drop_tables() {
-    while getopts ":e:" option; do
-        case "${option}" in
-            e)
-                e=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${e}" ]; then
-        e="docker"
-    fi
-
-    cd ./jefe/
-    fab environment:${e},true drop_tables
-    cd ..
-}
-
-deploy() {
-    while getopts ":e:" option; do
-        case "${option}" in
-            e)
-                e=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${e}" ]; then
-        e="docker"
-    fi
-
-    cd ./jefe/
-    fab environment:${e},true deploy
-    cd ..
-}
-
-backup() {
-    while getopts ":e:" option; do
-        case "${option}" in
-            e)
-                e=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${e}" ]; then
-        e="docker"
-    fi
-
-    cd ./jefe/
-    fab environment:${e},true backup
-    cd ..
-}
-
-execute() {
-    while getopts ":e:" option; do
-        case "${option}" in
-            e)
-                e=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${e}" ]; then
-        e="docker"
-    fi
-
-    cd ./jefe/
-    fab environment:${e},true execute
-    cd ..
-}
-
-it() {
-    while getopts ":c:" option; do
-        case "${option}" in
-            c)
-                c=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${c}" ]; then
-        c="docker-php_php"
-    fi
-
-    cd ./jefe/
-    fab it:${c}
-    cd ..
-}
-
-logs() {
-    while getopts ":c:" option; do
-        case "${option}" in
-            c)
-                c=${OPTARG}
-                ;;
-        esac
-    done
-    shift $((OPTIND-1))
-
-    if [ -z "${c}" ]; then
-        c="docker-php_php"
-    fi
-
-    cd ./jefe/
-    fab logs:${c}
-    cd ..
+load_settings_env(){
+    # access yaml content
+    user=$( get_yamlenv $1 user)
+    group=$( get_yamlenv $1 group)
+    host=$( get_yamlenv $1 host)
+    port=$( get_yamlenv $1 port)
+    public_dir=$( get_yamlenv $1 public_dir)
+    dbname=$( get_yamlenv $1 dbname)
+    dbuser=$( get_yamlenv $1 dbuser)
+    dbpassword=$( get_yamlenv $1 dbpassword)
+    dbhost=$( get_yamlenv $1 dbhost)
+    exclude=$( get_yamlenv $1 exclude)
 }
 
 # Docker compose var env configuration.
 docker_env() {
     out "Docker compose var env configuration." 4
-    if [[ ! -f "./jefe/.env" ]]; then
-        cp ./jefe/default.env ./jefe/.env
-    fi
-    out "Write project name (default docker-$project_type):" 5
+    #     if [[ ! -f ".jefe/.env" ]]; then
+    #         cp .jefe/default.env .jefe/.env
+    #     fi
+    echo "" > .jefe/.env
+    set_dotenv PROJECT_TYPE $project_type
+    out "Write project name (default docker_$project_type):" 5
     read option
     if [ -z $option ]; then
-        dotenv -f ./jefe/.env set PROJECT_NAME docker-$project_type
+        set_dotenv PROJECT_NAME docker_$project_type
     else
-        dotenv -f ./jefe/.env set PROJECT_NAME $option
+        set_dotenv PROJECT_NAME $option
     fi
-    out "Write project root, directory path from your proyect (default app):" 5
+    out "Write project root, directory path from your proyect (default source):" 5
     read option
     if [ -z $option ]; then
-        dotenv -f ./jefe/.env set PROJECT_ROOT app
+        set_dotenv PROJECT_ROOT "../source"
     else
-        dotenv -f ./jefe/.env set PROJECT_ROOT $option
+        set_dotenv PROJECT_ROOT "../$option"
     fi
-    out "Write database name (default docker):" 5
+    out "Write vhost (default symfony.local):" 5
     read option
     if [ -z $option ]; then
-        dotenv -f ./jefe/.env set DB_NAME docker
+        set_dotenv VHOST "jefe.local"
     else
-        dotenv -f ./jefe/.env set DB_NAME $option
+        set_dotenv VHOST $option
     fi
-    out "Write database username (default docker):" 5
+    out "Write database name (default symfony):" 5
     read option
     if [ -z $option ]; then
-        dotenv -f ./jefe/.env set DB_USERNAME docker
+        set_dotenv DB_NAME "symfony"
     else
-        dotenv -f ./jefe/.env set DB_USERNAME $option
+        set_dotenv DB_NAME $option
     fi
-    out "Write database password (default docker):" 5
+    out "Write database username (default symfony):" 5
     read option
     if [ -z $option ]; then
-        dotenv -f ./jefe/.env set DB_PASSWORD docker
+        set_dotenv DB_USERNAME "symfony"
     else
-        dotenv -f ./jefe/.env set DB_PASSWORD $option
+        set_dotenv DB_USERNAME $option
     fi
+    out "Write database password (default password):" 5
+    read option
+    if [ -z $option ]; then
+        set_dotenv DB_PASSWORD "password"
+    else
+        set_dotenv DB_PASSWORD $option
+    fi
+    out "Database root password is password" 3
+    set_dotenv DB_ROOT_PASSWORD "password"
+    out "phpMyAdmin url: localhost:8080" 3
+    set_dotenv PHPMYADMIN_PORT "8080"
+    # Set nginx port to 80
+    set_dotenv NGINX_PORT "80"
 }
 
-# Config environments.
-config_environments() {
-    out "Config environments.." 4
-    if [[ ! -f "./jefe/.settings.yaml" ]]; then
-        cp ./jefe/default.settings.yaml ./jefe/settings.yaml
-    fi
-    out "Select editor to open environment settings file" 5
-    out "0) Vi" 5
-    out "1) Nano" 5
-    echo "Type the option (number) from the editor that you want, followed by [ENTER]:"
-    read option
-    case $option in
-        0)
-            vi ./jefe/settings.yaml
-            ;;
-        1)
-            nano ./jefe/settings.yaml
-            ;;
-        *)
-            vi ./jefe/settings.yaml
-            ;;
-    esac
+backup() {
+    echo 'Not implemented'
 }
 
-help() {
-    cd ./jefe/
-    fab --list
-    cd ..
+dump() {
+    echo 'Not implemented'
 }
 
-# call arguments verbatim:
-$@
+importdb() {
+    echo 'Not implemented'
+}
+
+resetdb() {
+    echo 'Not implemented'
+}
+
+migrate() {
+    echo 'Not implemented'
+}
