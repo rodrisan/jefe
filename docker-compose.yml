@@ -43,7 +43,7 @@ services:
         environment:
             MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
             MYSQL_DATABASE: "${DB_NAME}"
-            MYSQL_USER: "${DB_USERNAME}"
+            MYSQL_USER: "${DB_USER}"
             MYSQL_PASSWORD: "${DB_PASSWORD}"
 
     phpmyadmin:
@@ -65,3 +65,4 @@ volumes:
 networks:
     database:
     server:
+

@@ -111,9 +111,9 @@ docker_env() {
     out "Write database username (default symfony):" 5
     read option
     if [ -z $option ]; then
-        set_dotenv DB_USERNAME "symfony"
+        set_dotenv DB_USER "symfony"
     else
-        set_dotenv DB_USERNAME $option
+        set_dotenv DB_USER $option
     fi
     out "Write database password (default password):" 5
     read option
@@ -143,7 +143,20 @@ importdb() {
 }
 
 resetdb() {
-    echo 'Not implemented'
+    e=$1
+    shift $((OPTIND-1))
+
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+
+    if [[ "$e" == "docker" ]]; then
+        load_dotenv
+        docker exec -i ${project_name}_db mysql -u"${dbuser}" -p"${dbpassword}" -e "DROP DATABASE IF EXISTS ${dbname}; CREATE DATABASE ${dbname}"
+    else
+        load_settings_env $e
+        ssh "${user}@${host} 'mysql -u${dbuser} -p\"${dbpassword}\" ${dbname} --host=${dbhost} -e \"DROP DATABASE IF EXISTS ${dbname}; CREATE DATABASE ${dbname}\"'"
+    fi
 }
 
 migrate() {
