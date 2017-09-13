@@ -149,3 +149,17 @@ resetdb() {
 migrate() {
     echo 'Not implemented'
 }
+
+composer_install() {
+    e=$1
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+    if [[ "$e" == "docker" ]]; then
+        load_dotenv
+        docker exec -it ${project_name}_php bash -c 'composer install'
+    else
+        load_settings_env $e
+        ssh ${user}@${host} -p $port "cd ${public_dir}/; composer install"
+    fi
+}
