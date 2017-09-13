@@ -138,8 +138,25 @@ dump() {
     echo 'Not implemented'
 }
 
-importdb() {
-    echo 'Not implemented'
+import() {
+    f=$1
+    e=$2
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+
+    if [ -z "${f}" ]; then
+        f="dump.sql"
+    fi
+
+    load_dotenv
+    if [[ "$e" == "docker" ]]; then
+        echo "mysql -u${dbuser} -p"${dbpassword}" ${dbname}  < ./dumps/${f}"
+        docker exec -i ${project_name}_db mysql -u ${dbuser} -p"${dbpassword}" ${dbname}  < "./dumps/${f}"
+    else
+        load_settings_env $e
+        ssh "${user}@${host} 'mysql -u${dbuser} -p\"${dbpassword}\" ${dbname} --host=${dbhost} < ./dumps/${f}'"
+    fi
 }
 
 resetdb() {
