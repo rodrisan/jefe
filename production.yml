@@ -15,6 +15,7 @@ services:
         links:
             - postgresql
         command: [ "rails", "server", "-b", "0.0.0.0" ]
+        entrypoint: ./postinstall.sh
 
     postgresql:
         image: postgres:9.6
