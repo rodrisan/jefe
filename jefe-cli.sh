@@ -32,7 +32,7 @@ load_dotenv(){
     project_name=$( get_dotenv "PROJECT_NAME" )
     project_root=$( get_dotenv "PROJECT_ROOT" )
     dbname=$( get_dotenv "DB_NAME" )
-    dbuser=$( get_dotenv "DB_USERNAME" )
+    dbuser=$( get_dotenv "DB_USER" )
     dbpassword=$( get_dotenv "DB_PASSWORD" )
     dbhost=$( get_dotenv "DB_HOST" )
 }
@@ -87,31 +87,31 @@ docker_env() {
     else
         set_dotenv PROJECT_NAME $option
     fi
-    out "Write project root, directory path from your proyect (default source):" 5
+    out "Write project root, directory path from your proyect (default src):" 5
     read option
     if [ -z $option ]; then
-        set_dotenv PROJECT_ROOT "../source"
+        set_dotenv PROJECT_ROOT "../src"
     else
         set_dotenv PROJECT_ROOT "../$option"
     fi
-    out "Write vhost (default symfony.local):" 5
+    out "Write vhost (default laravel.local):" 5
     read option
     if [ -z $option ]; then
-        set_dotenv VHOST "jefe.local"
+        set_dotenv VHOST "laravel.local"
     else
         set_dotenv VHOST $option
     fi
-    out "Write database name (default symfony):" 5
+    out "Write database name (default laravel):" 5
     read option
     if [ -z $option ]; then
-        set_dotenv DB_NAME "symfony"
+        set_dotenv DB_NAME "laravel"
     else
         set_dotenv DB_NAME $option
     fi
-    out "Write database username (default symfony):" 5
+    out "Write database username (default laravel):" 5
     read option
     if [ -z $option ]; then
-        set_dotenv DB_USER "symfony"
+        set_dotenv DB_USER "laravel"
     else
         set_dotenv DB_USER $option
     fi
@@ -135,7 +135,23 @@ backup() {
 }
 
 dump() {
-    echo 'Not implemented'
+    f=$1
+    e=$2
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+
+    if [ -z "${f}" ]; then
+        f="dump.sql"
+    fi
+
+    load_dotenv
+    if [[ "$e" == "docker" ]]; then
+        docker exec -i ${project_name}_db mysqldump -u ${dbuser} -p"${dbpassword}" ${dbname}  > "./dumps/${f}"
+    else
+        load_settings_env $e
+        ssh ${user}@${host} "mysqldump -u${dbuser} -p\"${dbpassword}\" ${dbname} --host=${dbhost} > ./dumps/${f}"
+    fi
 }
 
 import() {
@@ -155,7 +171,7 @@ import() {
         docker exec -i ${project_name}_db mysql -u ${dbuser} -p"${dbpassword}" ${dbname}  < "./dumps/${f}"
     else
         load_settings_env $e
-        ssh "${user}@${host} 'mysql -u${dbuser} -p\"${dbpassword}\" ${dbname} --host=${dbhost} < ./dumps/${f}'"
+        ssh ${user}@${host} "mysql -u${dbuser} -p\"${dbpassword}\" ${dbname} --host=${dbhost} < ./dumps/${f}"
     fi
 }
 
@@ -172,12 +188,78 @@ resetdb() {
         docker exec -i ${project_name}_db mysql -u"${dbuser}" -p"${dbpassword}" -e "DROP DATABASE IF EXISTS ${dbname}; CREATE DATABASE ${dbname}"
     else
         load_settings_env $e
-        ssh "${user}@${host} 'mysql -u${dbuser} -p\"${dbpassword}\" ${dbname} --host=${dbhost} -e \"DROP DATABASE IF EXISTS ${dbname}; CREATE DATABASE ${dbname}\"'"
+        ssh ${user}@${host} "mysql -u${dbuser} -p\"${dbpassword}\" ${dbname} --host=${dbhost} -e \"DROP DATABASE IF EXISTS ${dbname}; CREATE DATABASE ${dbname}\""
     fi
 }
 
 migrate() {
-    echo 'Not implemented'
+    e=$1
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+    if [[ "$e" == "docker" ]]; then
+        load_dotenv
+        docker exec -it ${project_name}_php bash -c 'php artisan migrate'
+    else
+        load_settings_env $e
+        ssh ${user}@${host} -p $port "cd ${public_dir}/; php artisan migrate"
+    fi
+}
+
+migrate-force() {
+    e=$1
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+    if [[ "$e" == "docker" ]]; then
+        load_dotenv
+        docker exec -it ${project_name}_php bash -c 'php artisan migrate --force'
+    else
+        load_settings_env $e
+        ssh ${user}@${host} -p $port "cd ${public_dir}/; php artisan migrate --force"
+    fi
+}
+
+migrate-refresh() {
+    e=$1
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+    if [[ "$e" == "docker" ]]; then
+        load_dotenv
+        docker exec -it ${project_name}_php bash -c 'php artisan migrate:refresh'
+    else
+        load_settings_env $e
+        ssh ${user}@${host} -p $port "cd ${public_dir}/; php artisan migrate:refresh"
+    fi
+}
+
+migrate-refresh-seed() {
+    e=$1
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+    if [[ "$e" == "docker" ]]; then
+        load_dotenv
+        docker exec -it ${project_name}_php bash -c 'php artisan migrate:refresh --seed'
+    else
+        load_settings_env $e
+        ssh ${user}@${host} -p $port "cd ${public_dir}/; php artisan migrate:refresh --seed"
+    fi
+}
+
+seed() {
+    e=$1
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+    if [[ "$e" == "docker" ]]; then
+        load_dotenv
+        docker exec -it ${project_name}_php bash -c 'php artisan db:seed'
+    else
+        load_settings_env $e
+        ssh ${user}@${host} -p $port "cd ${public_dir}/; php artisan db:seed"
+    fi
 }
 
 composer_install() {
@@ -206,4 +288,32 @@ composer_update() {
         load_settings_env $e
         ssh ${user}@${host} -p $port "cd ${public_dir}/; composer update"
     fi
+}
+
+deploy() {
+    e=$1
+    t=$2
+
+    if [ -z "${e}" ]; then
+        e="docker"
+    fi
+
+    if [ -z "${t}" ]; then
+        t="false"
+    fi
+
+    load_dotenv
+    load_settings_env $e
+    excludes=$( echo $exclude | sed -e "s/;/ --exclude=/g" )
+    cd .jefe
+    if [ "${t}" == "true" ]; then
+        set -v #verbose on
+        rsync --dry-run -az --force --delete --progress --exclude=$excludes -e "ssh -p${port}" "$project_root/." "${user}@${host}:$public_dir"
+        set +v #verbose off
+    else
+        set -x #verbose on
+        rsync -az --force --delete --progress --exclude=$excludes -e "ssh -p$port" "$project_root/." "${user}@${host}:$public_dir"
+        set +x #verbose off
+    fi
+    cd ..
 }

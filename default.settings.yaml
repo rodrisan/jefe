@@ -1,15 +1,12 @@
 ---
 master:
-  user: user
-  group: group
-  hosts:
-      - example.com # DOMAIN OR IP
+  user: "user"
+  group: "group"
+  host: "example.com # DOMAIN OR IP"
+  port: 22
   public_dir: "path/to/public/"
-  cpchuy_dir: "/home/vagrant/chuy/"
-  dbname: name
-  dbuser: user
-  dbpassword: password
-  dbhost: localhost
-  exclude:
-      - "*.swp"
-
+  dbname: "name"
+  dbuser: "user"
+  dbpassword: "password"
+  dbhost: "localhost"
+  exclude: "*.swp;.env"
